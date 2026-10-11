@@ -43,6 +43,15 @@ def export_note_markdown(item_id):
 @login_required
 def resources(): return render_template('resources.html', resources=Resource.query.order_by(Resource.created_at.desc()).all())
 
+@main_bp.get('/resources/<int:resource_id>')
+@login_required
+def resource_detail(resource_id):
+    resource = db.session.get(Resource, resource_id)
+    if not resource:
+        from flask import abort
+        abort(404)
+    return render_template('resource_detail.html', resource=resource)
+
 @main_bp.get('/announcements')
 @login_required
 def announcements(): return render_template('announcements.html', announcements=Announcement.query.order_by(Announcement.created_at.desc()).all())
