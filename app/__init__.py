@@ -22,6 +22,15 @@ def create_app(test_config=None):
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        if request_wants_json():
+            return jsonify(error='Authentication required'), 401
+        from flask import redirect, url_for, flash
+        if login_manager.login_message:
+            flash(login_manager.login_message)
+        return redirect(url_for(login_manager.login_view))
+
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
     from app.routes.api import api_bp
