@@ -35,3 +35,30 @@ def test_overdue_task_indicators(client,student):
     js_res = client.get('/static/js/tasks.js')
     assert js_res.status_code == 200
     assert b'isOverdue' in js_res.data
+
+def test_task_duplication(client,student,admin):
+    login(client)
+    r = client.post('/api/tasks', json={'title':'Project Presentation','priority':'high','category':'project','due_date':'2030-02-15'})
+    assert r.status_code == 201
+    tid = r.get_json()['data']['id']
+    # Mark completed
+    client.put(f'/api/tasks/{tid}', json={'completed':True})
+
+    # Duplicate task
+    dup_res = client.post(f'/api/tasks/{tid}/duplicate')
+    assert dup_res.status_code == 201
+    dup_data = dup_res.get_json()['data']
+    assert dup_data['id'] != tid
+    assert dup_data['title'] == 'Project Presentation (Copy)'
+    assert dup_data['priority'] == 'high'
+    assert dup_data['category'] == 'project'
+    assert dup_data['due_date'] == '2030-02-15'
+    assert dup_data['completed'] is False  # not completed!
+
+    # 404 for bad task id
+    assert client.post('/api/tasks/9999/duplicate').status_code == 404
+
+    # Other user cannot duplicate
+    client.post('/logout')
+    login(client, 'admin@test.local')
+    assert client.post(f'/api/tasks/{tid}/duplicate').status_code == 404
