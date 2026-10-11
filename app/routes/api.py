@@ -77,6 +77,113 @@ def delete_task(item_id):
     if not t:return err('Task not found.',404)
     db.session.delete(t);db.session.commit();return ok()
 
+def validate_and_parse_task_item(item, index=0):
+    if not isinstance(item, dict):
+        raise ValueError(f"Task at index {index} must be a JSON object.")
+    title = item.get('title')
+    if not title or not isinstance(title, str) or not title.strip():
+        raise ValueError(f"Task at index {index} is missing a title.")
+    clean_title = limited(title.strip(), 150)
+    raw_desc = item.get('description', '')
+    if raw_desc is not None and not isinstance(raw_desc, str):
+        raise ValueError(f"Task at index {index} description must be a string.")
+    clean_desc = limited(raw_desc or '', 2000, False)
+    priority = item.get('priority', 'medium')
+    if priority not in {'low', 'medium', 'high'}:
+        raise ValueError(f"Task at index {index} has invalid priority: '{priority}'.")
+    category = item.get('category', 'other')
+    if category not in {'assignment', 'exam', 'project', 'personal', 'other'}:
+        raise ValueError(f"Task at index {index} has invalid category: '{category}'.")
+    raw_due = item.get('due_date')
+    due_date = None
+    if raw_due:
+        try:
+            due_date = parse_date(raw_due)
+        except ValueError:
+            raise ValueError(f"Task at index {index} has invalid due date format (expected YYYY-MM-DD).")
+    completed = bool(item.get('completed', False))
+    return {
+        'title': clean_title,
+        'description': clean_desc,
+        'priority': priority,
+        'category': category,
+        'due_date': due_date,
+        'completed': completed
+    }
+
+def extract_task_list(req):
+    import json
+    if 'file' in req.files:
+        f = req.files['file']
+        if not f.filename:
+            raise ValueError('No file selected.')
+        try:
+            raw = json.load(f)
+        except Exception:
+            raise ValueError('Uploaded file is not valid JSON.')
+    else:
+        raw = req.get_json(silent=True)
+        if raw is None:
+            raise ValueError('Invalid JSON payload.')
+    if isinstance(raw, list):
+        items = raw
+    elif isinstance(raw, dict) and 'tasks' in raw and isinstance(raw['tasks'], list):
+        items = raw['tasks']
+    elif isinstance(raw, dict) and 'data' in raw and isinstance(raw['data'], list):
+        items = raw['data']
+    else:
+        raise ValueError('Expected a JSON list of tasks or an object with a tasks array.')
+    if not items:
+        raise ValueError('No tasks found to import.')
+    return items
+
+@api_bp.get('/tasks/export')
+@login_required
+def export_tasks():
+    tasks = Task.query.filter_by(user_id=current_user.id).order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
+    tasks_data = [
+        {
+            'title': t.title,
+            'description': t.description or '',
+            'priority': t.priority,
+            'category': t.category,
+            'due_date': t.due_date.isoformat() if t.due_date else None,
+            'completed': t.completed
+        }
+        for t in tasks
+    ]
+    resp = jsonify({'success': True, 'data': tasks_data, 'tasks': tasks_data})
+    resp.headers['Content-Disposition'] = 'attachment; filename="tasks.json"'
+    return resp
+
+@api_bp.post('/tasks/import')
+@login_required
+def import_tasks():
+    try:
+        items = extract_task_list(request)
+        validated = [validate_and_parse_task_item(item, idx) for idx, item in enumerate(items)]
+        created = []
+        for task_dict in validated:
+            t = Task(
+                user_id=current_user.id,
+                title=task_dict['title'],
+                description=task_dict['description'],
+                priority=task_dict['priority'],
+                category=task_dict['category'],
+                due_date=task_dict['due_date'],
+                completed=task_dict['completed']
+            )
+            db.session.add(t)
+            created.append(t)
+        db.session.commit()
+        return ok({'imported_count': len(created), 'tasks': [task_json(t) for t in created]}, 201)
+    except ValueError as e:
+        db.session.rollback()
+        return err(str(e), 400)
+    except Exception:
+        db.session.rollback()
+        return err('Failed to import tasks.', 500)
+
 @api_bp.get('/notes')
 @login_required
 def get_notes():
