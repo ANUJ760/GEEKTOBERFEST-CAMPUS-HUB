@@ -391,7 +391,6 @@ def delete_user_account_api():
     delete_user_account(user_to_delete)
     return ok({'message': 'Account and all associated records deleted successfully.'})
 
-
 from app.models import StudyGroup, StudyGroupMember, StudyGroupResource
 
 def group_json(g, user_id=None):
@@ -560,3 +559,12 @@ def delete_group_resource_api(group_id, resource_id):
     db.session.delete(r)
     db.session.commit()
     return ok({'message': 'Resource deleted successfully.'})
+
+@api_bp.get('/search')
+@login_required
+def search_api():
+    from app.services.search import search_student_content
+    q = request.args.get('q', '').strip()
+    content_type = request.args.get('type', 'all')
+    results = search_student_content(current_user.id, q, content_type)
+    return ok(results)

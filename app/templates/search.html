@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <p class="eyebrow">Search your workspace</p>
+        <h1>Full-Text Search</h1>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+    <form method="get" action="{{ url_for('main.search') }}" class="toolbar" style="margin:0;">
+        <input type="text" name="q" value="{{ query }}" placeholder="Search across all your tasks and notes..." autofocus style="min-width:300px;flex:1;">
+        <select name="type">
+            <option value="all" {% if content_type=='all' %}selected{% endif %}>All Content</option>
+            <option value="tasks" {% if content_type=='tasks' %}selected{% endif %}>Tasks only</option>
+            <option value="notes" {% if content_type=='notes' %}selected{% endif %}>Notes only</option>
+        </select>
+        <button type="submit" class="btn primary">Search</button>
+    </form>
+</div>
+
+{% if query %}
+    <p class="muted" style="margin-bottom:20px;">Found <strong>{{ results.total }}</strong> result(s) for "{{ query }}"</p>
+
+    {% if results.tasks %}
+    <section style="margin-bottom:30px;">
+        <div class="card-head"><h2 style="margin:0 0 14px;font-size:18px;">Tasks ({{ results.tasks|length }})</h2></div>
+        <div style="display:grid;gap:12px;">
+            {% for t in results.tasks %}
+            <div class="card" style="padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span class="chip">{{ t.category }}</span>
+                        <span class="badge {{ t.priority }}">{{ t.priority }}</span>
+                        {% if t.completed %}<span class="badge completed">Completed</span>{% endif %}
+                    </div>
+                    {% if t.due_date %}<small class="muted">Due {{ t.due_date }}</small>{% endif %}
+                </div>
+                <h3 style="margin:8px 0 4px;"><a href="{{ url_for('main.tasks') }}" style="color:inherit;text-decoration:none;">{{ t.title }}</a></h3>
+                <p class="muted" style="margin:0;">{{ t.snippet }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if results.notes %}
+    <section style="margin-bottom:30px;">
+        <div class="card-head"><h2 style="margin:0 0 14px;font-size:18px;">Notes ({{ results.notes|length }})</h2></div>
+        <div style="display:grid;gap:12px;">
+            {% for n in results.notes %}
+            <div class="card" style="padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span class="chip">{{ n.subject }}</span>
+                    <small class="muted">Updated {{ n.updated_at[:10] }}</small>
+                </div>
+                <h3 style="margin:8px 0 4px;"><a href="{{ url_for('main.notes') }}" style="color:inherit;text-decoration:none;">{{ n.title }}</a></h3>
+                <p class="muted" style="margin:0;">{{ n.snippet }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if results.total == 0 %}
+    <div class="card empty">No tasks or notes match your search.</div>
+    {% endif %}
+{% else %}
+    <div class="card empty">Enter keywords above to search your tasks and study notes.</div>
+{% endif %}
+{% endblock %}

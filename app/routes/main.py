@@ -149,6 +149,15 @@ def announcements(): return render_template('announcements.html', announcements=
 @login_required
 def notifications(): return render_template('notifications.html', notifications=Notification.query.filter_by(user_id=current_user.id).order_by(Notification.created_at.desc()).all())
 
+@main_bp.get('/search')
+@login_required
+def search():
+    from app.services.search import search_student_content
+    q = request.args.get('q', '').strip()
+    content_type = request.args.get('type', 'all')
+    results = search_student_content(current_user.id, q, content_type)
+    return render_template('search.html', results=results, query=q, content_type=content_type)
+
 @main_bp.route('/profile', methods=['GET','POST'])
 @login_required
 def profile():
