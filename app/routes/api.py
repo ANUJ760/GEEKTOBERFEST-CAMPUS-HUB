@@ -193,6 +193,23 @@ def import_tasks():
         db.session.rollback()
         return err('Failed to import tasks.', 500)
 
+@api_bp.get('/tasks/calendar.ics')
+@login_required
+def get_task_calendar():
+    from flask import Response
+    from app.services.calendar import generate_ics_calendar
+    status = request.args.get('status', 'all')
+    query = Task.query.filter_by(user_id=current_user.id).filter(Task.due_date.isnot(None))
+    if status == 'pending':
+        query = query.filter_by(completed=False)
+    elif status == 'completed':
+        query = query.filter_by(completed=True)
+    tasks = query.order_by(Task.due_date.asc()).all()
+    ics_data = generate_ics_calendar(tasks, cal_name=f"{current_user.name}'s Tasks")
+    resp = Response(ics_data, mimetype='text/calendar')
+    resp.headers['Content-Disposition'] = 'attachment; filename="tasks.ics"'
+    return resp
+
 @api_bp.get('/notes')
 @login_required
 def get_notes():
