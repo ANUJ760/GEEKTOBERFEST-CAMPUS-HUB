@@ -22,6 +22,15 @@ def create_app(test_config=None):
     def load_user(user_id):
         return db.session.get(User, int(user_id))
 
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        if request_wants_json():
+            return jsonify(error='Authentication required'), 401
+        from flask import redirect, url_for, flash
+        if login_manager.login_message:
+            flash(login_manager.login_message)
+        return redirect(url_for(login_manager.login_view))
+
     from app.routes.auth import auth_bp
     from app.routes.main import main_bp
     from app.routes.api import api_bp
@@ -35,6 +44,30 @@ def create_app(test_config=None):
     def inject_globals():
         from datetime import date
         return {'app_name': 'CampusHub', 'now_date': date.today()}
+
+    @app.template_filter('relative_time')
+    def relative_time(dt):
+        if not dt: return ''
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc) if dt.tzinfo else datetime.now()
+        diff = now - dt
+        seconds = int(diff.total_seconds())
+        if seconds < 60:
+            return 'just now'
+        minutes = seconds // 60
+        if minutes < 60:
+            return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+        hours = minutes // 60
+        if hours < 24:
+            return f"{hours} hour{'s' if hours != 1 else ''} ago"
+        days = hours // 24
+        if days < 30:
+            return f"{days} day{'s' if days != 1 else ''} ago"
+        months = days // 30
+        if months < 12:
+            return f"{months} month{'s' if months != 1 else ''} ago"
+        years = days // 365
+        return f"{years} year{'s' if years != 1 else ''} ago"
 
     @app.errorhandler(400)
     def bad_request(e):
