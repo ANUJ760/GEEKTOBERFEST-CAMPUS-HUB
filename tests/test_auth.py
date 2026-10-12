@@ -8,3 +8,15 @@ def test_invalid_login(client):
 
 def test_logout(client,student):
     login(client); r=client.post('/logout',follow_redirects=True); assert r.status_code==200; assert b'logged out' in r.data
+
+def test_password_visibility_toggle(client):
+    r_login = client.get('/login')
+    assert r_login.status_code == 200
+    assert b'pw-toggle-btn' in r_login.data
+    assert b'aria-label="Show password"' in r_login.data
+    assert b'togglePasswordVisibility' in r_login.data
+
+    r_reg = client.get('/register')
+    assert r_reg.status_code == 200
+    assert b'pw-toggle-btn' in r_reg.data
+    assert b'togglePasswordVisibility' in r_reg.data
