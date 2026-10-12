@@ -28,6 +28,17 @@ def deadlines(): return render_template('deadlines.html', tasks=Task.query.filte
 @login_required
 def notes(): return render_template('notes.html', notes=Note.query.filter_by(user_id=current_user.id).order_by(Note.updated_at.desc()).all())
 
+@main_bp.get('/notes/<int:item_id>/export')
+@login_required
+def export_note_markdown(item_id):
+    import re
+    from flask import Response
+    note = Note.query.filter_by(id=item_id, user_id=current_user.id).first_or_404()
+    clean_title = re.sub(r'[^a-zA-Z0-9_\- ]+', '', note.title).strip().replace(' ', '_') or f'note-{note.id}'
+    filename = f"{clean_title}.md"
+    body = f"# {note.title}\n\n**Subject:** {note.subject or 'General'}\n**Updated:** {note.updated_at.strftime('%Y-%m-%d')}\n\n---\n\n{note.content}\n"
+    return Response(body, mimetype='text/markdown', headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
 @main_bp.get('/resources')
 @login_required
 def resources(): return render_template('resources.html', resources=Resource.query.order_by(Resource.created_at.desc()).all())
