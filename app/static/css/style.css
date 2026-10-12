@@ -17,3 +17,5 @@
 tr.is-overdue td{background:rgba(255,233,233,.35)}
 tr.is-overdue td:first-child{border-left:3px solid var(--danger)}
 
+.period-form{margin:0;display:inline-block}
+.period-select{padding:4px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text);cursor:pointer}
