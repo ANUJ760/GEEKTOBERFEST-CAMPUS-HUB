@@ -10,3 +10,13 @@ def test_task_crud_and_ownership(client,student,app):
 
 def test_protected_task_api(client):
     assert client.get('/api/tasks').status_code==401
+
+def test_task_page_and_copy_details(client,student):
+    login(client)
+    res = client.get('/tasks')
+    assert res.status_code == 200
+    assert b'tasks.js' in res.data
+    js_res = client.get('/static/js/tasks.js')
+    assert js_res.status_code == 200
+    assert b'copyTaskDetails' in js_res.data
+    assert b'Copy task details' in js_res.data
