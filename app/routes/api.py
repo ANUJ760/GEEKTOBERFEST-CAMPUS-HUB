@@ -560,11 +560,16 @@ def delete_group_resource_api(group_id, resource_id):
     db.session.commit()
     return ok({'message': 'Resource deleted successfully.'})
 
-@api_bp.get('/search')
+@api_bp.route('/search', methods=['GET', 'POST'])
 @login_required
 def search_api():
     from app.services.search import search_student_content
-    q = request.args.get('q', '').strip()
-    content_type = request.args.get('type', 'all')
+    if request.method == 'POST':
+        d = request.get_json(silent=True) or request.form.to_dict() or {}
+        q = (d.get('q') or d.get('search') or '').strip()
+        content_type = d.get('type', 'all')
+    else:
+        q = (request.args.get('q') or request.args.get('search') or '').strip()
+        content_type = request.args.get('type', 'all')
     results = search_student_content(current_user.id, q, content_type)
     return ok(results)

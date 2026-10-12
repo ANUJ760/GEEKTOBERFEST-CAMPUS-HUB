@@ -153,7 +153,7 @@ def notifications(): return render_template('notifications.html', notifications=
 @login_required
 def search():
     from app.services.search import search_student_content
-    q = request.args.get('q', '').strip()
+    q = (request.args.get('q') or request.args.get('search') or '').strip()
     content_type = request.args.get('type', 'all')
     results = search_student_content(current_user.id, q, content_type)
     return render_template('search.html', results=results, query=q, content_type=content_type)

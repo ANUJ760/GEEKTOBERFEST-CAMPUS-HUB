@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
+<style>mark{background:#fff2b2;color:#222;padding:0 2px;border-radius:3px;font-weight:600;}</style>
 <div class="page-head">
     <div>
         <p class="eyebrow">Search your workspace</p>
@@ -37,7 +38,7 @@
                     {% if t.due_date %}<small class="muted">Due {{ t.due_date }}</small>{% endif %}
                 </div>
                 <h3 style="margin:8px 0 4px;"><a href="{{ url_for('main.tasks') }}" style="color:inherit;text-decoration:none;">{{ t.title }}</a></h3>
-                <p class="muted" style="margin:0;">{{ t.snippet }}</p>
+                <p class="muted" style="margin:0;">{{ t.snippet|safe }}</p>
             </div>
             {% endfor %}
         </div>
@@ -55,7 +56,7 @@
                     <small class="muted">Updated {{ n.updated_at[:10] }}</small>
                 </div>
                 <h3 style="margin:8px 0 4px;"><a href="{{ url_for('main.notes') }}" style="color:inherit;text-decoration:none;">{{ n.title }}</a></h3>
-                <p class="muted" style="margin:0;">{{ n.snippet }}</p>
+                <p class="muted" style="margin:0;">{{ n.snippet|safe }}</p>
             </div>
             {% endfor %}
         </div>
