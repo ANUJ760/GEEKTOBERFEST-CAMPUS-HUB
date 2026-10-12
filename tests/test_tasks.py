@@ -20,3 +20,18 @@ def test_task_page_and_copy_details(client,student):
     assert js_res.status_code == 200
     assert b'copyTaskDetails' in js_res.data
     assert b'Copy task details' in js_res.data
+
+def test_overdue_task_indicators(client,student):
+    login(client)
+    # Add an overdue task
+    r = client.post('/api/tasks', json={'title':'Overdue Report','priority':'high','category':'assignment','due_date':'2020-01-01'})
+    assert r.status_code == 201
+    # Check deadlines page renders overdue badge
+    res = client.get('/deadlines')
+    assert res.status_code == 200
+    assert b'is-overdue' in res.data
+    assert b'Overdue' in res.data
+    # Check tasks js has overdue logic
+    js_res = client.get('/static/js/tasks.js')
+    assert js_res.status_code == 200
+    assert b'isOverdue' in js_res.data
