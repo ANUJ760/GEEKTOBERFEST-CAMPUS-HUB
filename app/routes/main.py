@@ -66,52 +66,8 @@ def profile():
 def export_user_data():
     import json
     from flask import Response
-    data = {
-        'user': {
-            'id': current_user.id,
-            'name': current_user.name,
-            'email': current_user.email,
-            'role': current_user.role,
-            'department': current_user.department,
-            'year': current_user.year,
-            'joined_at': current_user.joined_at.isoformat()
-        },
-        'tasks': [
-            {
-                'id': t.id,
-                'title': t.title,
-                'description': t.description,
-                'priority': t.priority,
-                'category': t.category,
-                'due_date': t.due_date.isoformat() if t.due_date else None,
-                'completed': t.completed,
-                'created_at': t.created_at.isoformat()
-            }
-            for t in current_user.tasks
-        ],
-        'notes': [
-            {
-                'id': n.id,
-                'title': n.title,
-                'subject': n.subject,
-                'content': n.content,
-                'created_at': n.created_at.isoformat(),
-                'updated_at': n.updated_at.isoformat()
-            }
-            for n in current_user.notes
-        ],
-        'notifications': [
-            {
-                'id': notif.id,
-                'title': notif.title,
-                'message': notif.message,
-                'kind': notif.kind,
-                'read': notif.read,
-                'created_at': notif.created_at.isoformat()
-            }
-            for notif in current_user.notifications
-        ]
-    }
+    from app.services.account import export_user_account_data
+    data = export_user_account_data(current_user)
     resp = Response(json.dumps(data, indent=2), mimetype='application/json')
     resp.headers['Content-Disposition'] = 'attachment; filename="campus_hub_data_export.json"'
     return resp
@@ -119,15 +75,12 @@ def export_user_data():
 @main_bp.post('/profile/delete-account')
 @login_required
 def delete_account():
-    from flask_login import logout_user
+    from app.services.account import delete_user_account
     password = request.form.get('password', '')
     if not current_user.check_password(password):
         flash('Incorrect password. Account deletion aborted.', 'error')
         return redirect(url_for('main.profile'))
     user_to_delete = current_user._get_current_object()
-    Resource.query.filter_by(added_by=user_to_delete.id).update({'added_by': None})
-    logout_user()
-    db.session.delete(user_to_delete)
-    db.session.commit()
+    delete_user_account(user_to_delete)
     flash('Your account and all associated data have been permanently deleted.', 'info')
     return redirect(url_for('auth.login'))

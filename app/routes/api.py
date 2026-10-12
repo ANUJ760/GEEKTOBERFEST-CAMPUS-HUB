@@ -159,33 +159,17 @@ def logout_api():
 @api_bp.get('/user/export')
 @login_required
 def export_user_data_api():
-    data = {
-        'user': {
-            'id': current_user.id,
-            'name': current_user.name,
-            'email': current_user.email,
-            'role': current_user.role,
-            'department': current_user.department,
-            'year': current_user.year,
-            'joined_at': current_user.joined_at.isoformat()
-        },
-        'tasks': [task_json(t) for t in current_user.tasks],
-        'notes': [note_json(n) for n in current_user.notes],
-        'notifications': [{'id': notif.id, 'title': notif.title, 'message': notif.message, 'kind': notif.kind, 'read': notif.read, 'created_at': notif.created_at.isoformat()} for notif in current_user.notifications]
-    }
-    return ok(data)
+    from app.services.account import export_user_account_data
+    return ok(export_user_account_data(current_user))
 
-@api_bp.delete('/user/account')
+@api_bp.route('/user/account', methods=['DELETE', 'POST'])
 @login_required
 def delete_user_account_api():
-    from flask_login import logout_user
-    d = request.get_json(silent=True) or {}
+    from app.services.account import delete_user_account
+    d = request.get_json(silent=True) or request.form.to_dict() or {}
     password = d.get('password', '')
     if not current_user.check_password(password):
         return err('Incorrect password. Account deletion aborted.', 400)
     user_to_delete = current_user._get_current_object()
-    Resource.query.filter_by(added_by=user_to_delete.id).update({'added_by': None})
-    logout_user()
-    db.session.delete(user_to_delete)
-    db.session.commit()
+    delete_user_account(user_to_delete)
     return ok({'message': 'Account and all associated records deleted successfully.'})
