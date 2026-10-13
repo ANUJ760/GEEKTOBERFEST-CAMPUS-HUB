@@ -16,3 +16,16 @@ def test_notification_relative_timestamps(client,student,app):
     res = client.get('/notifications')
     assert res.status_code == 200
     assert b'2 hours ago' in res.data
+
+def test_back_to_top_control(client,student):
+    login(client)
+    res = client.get('/dashboard')
+    assert res.status_code == 200
+    assert b'id="backToTop"' in res.data
+    assert b'aria-label="Back to top"' in res.data
+    js_res = client.get('/static/js/app.js')
+    assert js_res.status_code == 200
+    assert b'backToTop' in js_res.data
+    css_res = client.get('/static/css/style.css')
+    assert css_res.status_code == 200
+    assert b'back-to-top' in css_res.data
