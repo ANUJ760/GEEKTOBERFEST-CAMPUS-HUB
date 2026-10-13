@@ -60,3 +60,27 @@ def profile():
             db.session.commit(); flash('Profile updated.', 'success')
         except ValueError as e: flash(str(e),'error')
     return render_template('profile.html')
+
+@main_bp.get('/profile/export')
+@login_required
+def export_user_data():
+    import json
+    from flask import Response
+    from app.services.account import export_user_account_data
+    data = export_user_account_data(current_user)
+    resp = Response(json.dumps(data, indent=2), mimetype='application/json')
+    resp.headers['Content-Disposition'] = 'attachment; filename="campus_hub_data_export.json"'
+    return resp
+
+@main_bp.post('/profile/delete-account')
+@login_required
+def delete_account():
+    from app.services.account import delete_user_account
+    password = request.form.get('password', '')
+    if not current_user.check_password(password):
+        flash('Incorrect password. Account deletion aborted.', 'error')
+        return redirect(url_for('main.profile'))
+    user_to_delete = current_user._get_current_object()
+    delete_user_account(user_to_delete)
+    flash('Your account and all associated data have been permanently deleted.', 'info')
+    return redirect(url_for('auth.login'))

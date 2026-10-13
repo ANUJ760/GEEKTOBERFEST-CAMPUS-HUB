@@ -155,3 +155,21 @@ def login_api():
 def logout_api():
     from flask_login import logout_user
     logout_user(); return ok()
+
+@api_bp.get('/user/export')
+@login_required
+def export_user_data_api():
+    from app.services.account import export_user_account_data
+    return ok(export_user_account_data(current_user))
+
+@api_bp.route('/user/account', methods=['DELETE', 'POST'])
+@login_required
+def delete_user_account_api():
+    from app.services.account import delete_user_account
+    d = request.get_json(silent=True) or request.form.to_dict() or {}
+    password = d.get('password', '')
+    if not current_user.check_password(password):
+        return err('Incorrect password. Account deletion aborted.', 400)
+    user_to_delete = current_user._get_current_object()
+    delete_user_account(user_to_delete)
+    return ok({'message': 'Account and all associated records deleted successfully.'})
