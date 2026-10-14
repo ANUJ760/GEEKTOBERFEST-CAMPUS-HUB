@@ -107,6 +107,103 @@ def delete_note(item_id):
     if not n:return err('Note not found.',404)
     db.session.delete(n);db.session.commit();return ok()
 
+
+from app.models import TimetableEntry, DAYS_OF_WEEK
+from app.services.timetable import parse_time_str, get_upcoming_classes
+
+@api_bp.get('/timetable')
+@login_required
+def get_timetable():
+    day = request.args.get('day')
+    query = TimetableEntry.query.filter_by(user_id=current_user.id)
+    if day is not None and day != '':
+        try:
+            day_int = int(day)
+            query = query.filter_by(day_of_week=day_int)
+        except ValueError:
+            pass
+    entries = query.order_by(TimetableEntry.day_of_week.asc(), TimetableEntry.start_time.asc()).all()
+    return ok([e.to_dict() for e in entries])
+
+@api_bp.get('/timetable/upcoming')
+@login_required
+def get_upcoming_timetable():
+    upcoming = get_upcoming_classes(current_user)
+    return ok([{
+        'id': u['entry'].id,
+        'course_code': u['entry'].course_code,
+        'course_name': u['entry'].course_name,
+        'day_name': u['day_name'],
+        'start_time': u['entry'].start_time.strftime('%H:%M'),
+        'end_time': u['entry'].end_time.strftime('%H:%M'),
+        'location': u['entry'].location,
+        'instructor': u['entry'].instructor,
+        'color': u['entry'].color,
+        'is_today': u['is_today'],
+        'is_ongoing': u['is_ongoing']
+    } for u in upcoming])
+
+@api_bp.post('/timetable')
+@login_required
+def create_timetable_entry():
+    d = request.get_json(silent=True) or {}
+    try:
+        code = limited(d.get('course_code'), 30)
+        name = limited(d.get('course_name'), 100)
+        day = int(d.get('day_of_week', 0))
+        if not (0 <= day <= 6):
+            return err('day_of_week must be between 0 (Monday) and 6 (Sunday).')
+        start = parse_time_str(d.get('start_time'))
+        end = parse_time_str(d.get('end_time'))
+        if start >= end:
+            return err('Start time must be before end time.')
+        loc = limited(d.get('location', ''), 100, False)
+        inst = limited(d.get('instructor', ''), 100, False)
+        color = limited(d.get('color', '#3157d5'), 20, False)
+        entry = TimetableEntry(user_id=current_user.id, course_code=code, course_name=name, day_of_week=day, start_time=start, end_time=end, location=loc, instructor=inst, color=color)
+        db.session.add(entry)
+        db.session.commit()
+        return ok(entry.to_dict(), 201)
+    except ValueError as e:
+        return err(str(e))
+
+@api_bp.put('/timetable/<int:item_id>')
+@login_required
+def update_timetable_entry(item_id):
+    entry = TimetableEntry.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if not entry:
+        return err('Timetable entry not found.', 404)
+    d = request.get_json(silent=True) or {}
+    try:
+        if 'course_code' in d: entry.course_code = limited(d.get('course_code'), 30)
+        if 'course_name' in d: entry.course_name = limited(d.get('course_name'), 100)
+        if 'day_of_week' in d:
+            day = int(d.get('day_of_week'))
+            if not (0 <= day <= 6): return err('day_of_week must be between 0 and 6.')
+            entry.day_of_week = day
+        if 'start_time' in d: entry.start_time = parse_time_str(d.get('start_time'))
+        if 'end_time' in d: entry.end_time = parse_time_str(d.get('end_time'))
+        if entry.start_time >= entry.end_time:
+            return err('Start time must be before end time.')
+        if 'location' in d: entry.location = limited(d.get('location', ''), 100, False)
+        if 'instructor' in d: entry.instructor = limited(d.get('instructor', ''), 100, False)
+        if 'color' in d: entry.color = limited(d.get('color', '#3157d5'), 20, False)
+        db.session.commit()
+        return ok(entry.to_dict())
+    except ValueError as e:
+        return err(str(e))
+
+@api_bp.delete('/timetable/<int:item_id>')
+@login_required
+def delete_timetable_entry(item_id):
+    entry = TimetableEntry.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if not entry:
+        return err('Timetable entry not found.', 404)
+    db.session.delete(entry)
+    db.session.commit()
+    return ok({'message': 'Timetable entry deleted successfully.'})
+
+
 @api_bp.get('/resources')
 @login_required
 def get_resources():

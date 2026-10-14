@@ -51,6 +51,48 @@ class Note(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
+
+DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+
+class TimetableEntry(db.Model):
+    __tablename__ = 'timetable_entries'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    course_code = db.Column(db.String(30), nullable=False)
+    course_name = db.Column(db.String(100), nullable=False)
+    day_of_week = db.Column(db.Integer, nullable=False, index=True)
+    start_time = db.Column(db.Time, nullable=False)
+    end_time = db.Column(db.Time, nullable=False)
+    location = db.Column(db.String(100), default='')
+    instructor = db.Column(db.String(100), default='')
+    color = db.Column(db.String(20), default='#3157d5')
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    user = db.relationship('User', backref=db.backref('timetable_entries', lazy=True, cascade='all, delete-orphan'))
+
+    @property
+    def day_name(self):
+        if 0 <= self.day_of_week < len(DAYS_OF_WEEK):
+            return DAYS_OF_WEEK[self.day_of_week]
+        return 'Unknown'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'course_code': self.course_code,
+            'course_name': self.course_name,
+            'day_of_week': self.day_of_week,
+            'day_name': self.day_name,
+            'start_time': self.start_time.strftime('%H:%M') if self.start_time else '',
+            'end_time': self.end_time.strftime('%H:%M') if self.end_time else '',
+            'location': self.location,
+            'instructor': self.instructor,
+            'color': self.color
+        }
+
+
 class Resource(db.Model):
     __tablename__ = 'resources'
     id = db.Column(db.Integer, primary_key=True)

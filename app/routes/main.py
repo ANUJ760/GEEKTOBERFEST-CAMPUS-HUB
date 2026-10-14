@@ -24,6 +24,52 @@ def tasks(): return render_template('tasks.html', tasks=Task.query.filter_by(use
 @login_required
 def deadlines(): return render_template('deadlines.html', tasks=Task.query.filter_by(user_id=current_user.id).order_by(Task.due_date.asc().nullslast()).all())
 
+
+from app.models import TimetableEntry, DAYS_OF_WEEK
+from app.services.timetable import parse_time_str, get_weekly_timetable, get_upcoming_classes
+
+@main_bp.get('/timetable')
+@login_required
+def timetable():
+    weekly_schedule = get_weekly_timetable(current_user)
+    upcoming_classes = get_upcoming_classes(current_user)
+    return render_template('timetable.html', schedule=weekly_schedule, upcoming=upcoming_classes, days=DAYS_OF_WEEK)
+
+@main_bp.post('/timetable')
+@login_required
+def create_timetable():
+    try:
+        code = limited(request.form.get('course_code'), 30)
+        name = limited(request.form.get('course_name'), 100)
+        day = int(request.form.get('day_of_week', 0))
+        start = parse_time_str(request.form.get('start_time'))
+        end = parse_time_str(request.form.get('end_time'))
+        if start >= end:
+            raise ValueError('Start time must be before end time.')
+        loc = limited(request.form.get('location', ''), 100, False)
+        inst = limited(request.form.get('instructor', ''), 100, False)
+        color = limited(request.form.get('color', '#3157d5'), 20, False)
+        entry = TimetableEntry(user_id=current_user.id, course_code=code, course_name=name, day_of_week=day, start_time=start, end_time=end, location=loc, instructor=inst, color=color)
+        db.session.add(entry)
+        db.session.commit()
+        flash(f'Added {code} to timetable.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
+    return redirect(url_for('main.timetable'))
+
+@main_bp.post('/timetable/<int:item_id>/delete')
+@login_required
+def delete_timetable(item_id):
+    entry = TimetableEntry.query.filter_by(id=item_id, user_id=current_user.id).first()
+    if not entry:
+        flash('Timetable entry not found.', 'error')
+    else:
+        db.session.delete(entry)
+        db.session.commit()
+        flash('Class removed from timetable.', 'success')
+    return redirect(url_for('main.timetable'))
+
+
 @main_bp.get('/notes')
 @login_required
 def notes(): return render_template('notes.html', notes=Note.query.filter_by(user_id=current_user.id).order_by(Note.updated_at.desc()).all())
