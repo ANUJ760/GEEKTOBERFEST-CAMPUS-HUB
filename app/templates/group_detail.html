@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow"><a href="{{ url_for('main.groups') }}" style="color: inherit; text-decoration: none;">← Study Groups</a> / {{ group.subject }}</p>
+    <h1>{{ group.name }}</h1>
+    {% if group.description %}<p class="muted" style="margin-top: 4px;">{{ group.description }}</p>{% endif %}
+  </div>
+  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    {% if is_member %}
+      <button class="btn primary" onclick="openModal('resource-modal')">+ Share Resource</button>
+      <form method="POST" action="{{ url_for('main.leave_group', group_id=group.id) }}" style="display: inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn ghost danger" onclick="return confirm('Leave this study group?')">Leave Group</button>
+      </form>
+    {% else %}
+      <form method="POST" action="{{ url_for('main.join_group', group_id=group.id) }}" style="display: inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn primary">Join Group</button>
+      </form>
+    {% endif %}
+    {% if is_creator %}
+      <form method="POST" action="{{ url_for('main.delete_group', group_id=group.id) }}" style="display: inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn danger" onclick="return confirm('Are you sure you want to delete this study group?')">Delete Group</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-head">
+      <h2>Members ({{ group.members|length }})</h2>
+    </div>
+    {% for m in group.members %}
+    <div class="list-row">
+      <div>
+        <strong>{{ m.user.name }}</strong>
+        <small class="muted">Joined {{ m.joined_at.strftime('%d %b %Y') }}</small>
+      </div>
+      <div>
+        <span class="badge {% if m.role == 'creator' %}high{% else %}upcoming{% endif %}">{{ m.role }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Shared Resources</h2>
+      {% if is_member %}
+      <button class="btn ghost" onclick="openModal('resource-modal')" style="font-size: 13px;">+ Share</button>
+      {% endif %}
+    </div>
+
+    {% if is_member or current_user.role == 'admin' %}
+      {% for r in group.resources %}
+      <div class="list-row">
+        <div>
+          <a href="{{ r.url }}" target="_blank" rel="noopener" style="font-weight: 600; text-decoration: none; color: var(--primary);">{{ r.title }} ↗</a>
+          {% if r.description %}<p style="margin: 3px 0; font-size: 13px; color: var(--muted);">{{ r.description }}</p>{% endif %}
+          <small class="muted">Shared by {{ r.user.name }} · {{ r.resource_type }} · {{ r.created_at.strftime('%d %b %Y') }}</small>
+        </div>
+        {% if r.user_id == current_user.id or is_creator %}
+        <form method="POST" action="{{ url_for('main.delete_group_resource', group_id=group.id, resource_id=r.id) }}" style="margin: 0;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="icon-btn" title="Delete resource" onclick="return confirm('Delete this shared resource?')">🗑</button>
+        </form>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="empty">No shared resources yet. Share study guides, links, or documents with the group!</div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        🔒 You must be a member of this study group to access and share study resources.
+        <br><br>
+        <form method="POST" action="{{ url_for('main.join_group', group_id=group.id) }}" style="display: inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn primary">Join Group</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if is_member %}
+<div id="resource-modal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeModal('resource-modal')">×</button>
+    <h2>Share Resource with {{ group.name }}</h2>
+    <form method="POST" action="{{ url_for('main.add_group_resource', group_id=group.id) }}" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        Resource Title
+        <input name="title" required maxlength="150" placeholder="e.g. Lecture Notes Chapter 4">
+      </label>
+      <label>
+        URL
+        <input name="url" required type="url" maxlength="500" placeholder="https://...">
+      </label>
+      <label>
+        Resource Type
+        <select name="resource_type">
+          <option value="Website">Website</option>
+          <option value="Documentation">Documentation</option>
+          <option value="YouTube">YouTube</option>
+          <option value="PDF">PDF</option>
+          <option value="Course">Course</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
+      <label>
+        Description
+        <textarea name="description" maxlength="2000" rows="3" placeholder="Brief note on what this resource covers..."></textarea>
+      </label>
+      <button class="btn primary">Share Resource</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
