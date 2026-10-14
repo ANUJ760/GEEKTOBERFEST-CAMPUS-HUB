@@ -29,3 +29,36 @@ def test_back_to_top_control(client,student):
     css_res = client.get('/static/css/style.css')
     assert css_res.status_code == 200
     assert b'back-to-top' in css_res.data
+
+def test_dashboard_period_selection_api(client, student):
+    from datetime import date, timedelta
+    login(client)
+    data7 = client.get('/api/dashboard').get_json()['data']
+    assert data7['period'] == '7d'
+    assert len(data7['daily']) == 7
+
+    data14 = client.get('/api/dashboard?period=14d').get_json()['data']
+    assert data14['period'] == '14d'
+    assert len(data14['daily']) == 14
+
+    data30 = client.get('/api/dashboard?period=30d').get_json()['data']
+    assert data30['period'] == '30d'
+    assert len(data30['daily']) == 30
+
+    data_month = client.get('/api/dashboard?period=month').get_json()['data']
+    assert data_month['period'] == 'month'
+    today = date.today()
+    assert len(data_month['daily']) == today.day
+
+    start = (today - timedelta(days=5)).isoformat()
+    end = today.isoformat()
+    data_custom = client.get(f'/api/dashboard?start_date={start}&end_date={end}').get_json()['data']
+    assert data_custom['period'] == 'custom'
+    assert len(data_custom['daily']) == 6
+
+def test_dashboard_web_date_range(client, student):
+    login(client)
+    resp = client.get('/dashboard?period=14d')
+    assert resp.status_code == 200
+    assert b'Last 14 days' in resp.data
+    assert b'selected' in resp.data

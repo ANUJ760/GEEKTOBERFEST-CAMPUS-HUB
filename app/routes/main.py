@@ -14,7 +14,11 @@ def index(): return redirect(url_for('main.dashboard')) if current_user.is_authe
 @main_bp.get('/dashboard')
 @login_required
 def dashboard():
-    generate_notifications(current_user); return render_template('dashboard.html', stats=dashboard_stats(current_user))
+    period=request.args.get('period','7d')
+    start_date=request.args.get('start_date')
+    end_date=request.args.get('end_date')
+    generate_notifications(current_user)
+    return render_template('dashboard.html', stats=dashboard_stats(current_user,start_date=start_date,end_date=end_date,period=period))
 
 @main_bp.get('/tasks')
 @login_required

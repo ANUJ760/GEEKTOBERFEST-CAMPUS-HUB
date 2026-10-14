@@ -225,7 +225,11 @@ def get_announcements():
 @api_bp.get('/dashboard')
 @login_required
 def dashboard_api():
-    s=dashboard_stats(current_user); return ok({'total':s['total'],'completed':s['completed'],'pending':s['pending'],'productivity':s['productivity'],'daily':s['daily']})
+    period=request.args.get('period','7d')
+    start_date=request.args.get('start_date')
+    end_date=request.args.get('end_date')
+    s=dashboard_stats(current_user,start_date=start_date,end_date=end_date,period=period)
+    return ok({'total':s['total'],'completed':s['completed'],'pending':s['pending'],'productivity':s['productivity'],'daily':s['daily'],'period':s['period'],'period_completed':s['period_completed'],'start_date':s['start_date'],'end_date':s['end_date']})
 
 @api_bp.get('/notifications')
 @login_required
