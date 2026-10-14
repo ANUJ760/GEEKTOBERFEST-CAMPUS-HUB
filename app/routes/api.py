@@ -70,6 +70,15 @@ def update_task(item_id):
         db.session.commit(); return ok(task_json(t))
     except ValueError as e:return err(str(e))
 
+@api_bp.post('/tasks/<int:item_id>/duplicate')
+@login_required
+def duplicate_task(item_id):
+    t=Task.query.filter_by(id=item_id,user_id=current_user.id).first()
+    if not t: return err('Task not found.',404)
+    copy_title = f"{t.title} (Copy)" if len(f"{t.title} (Copy)") <= 150 else t.title
+    dup=Task(user_id=current_user.id,title=copy_title,description=t.description,priority=t.priority,category=t.category,due_date=t.due_date,completed=False)
+    db.session.add(dup); db.session.commit(); return ok(task_json(dup),201)
+
 @api_bp.delete('/tasks/<int:item_id>')
 @login_required
 def delete_task(item_id):
