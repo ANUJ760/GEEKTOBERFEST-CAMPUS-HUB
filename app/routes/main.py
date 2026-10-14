@@ -24,6 +24,54 @@ def dashboard():
 @login_required
 def tasks(): return render_template('tasks.html', tasks=Task.query.filter_by(user_id=current_user.id).order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all())
 
+@main_bp.get('/tasks/export')
+@login_required
+def export_tasks_route():
+    tasks = Task.query.filter_by(user_id=current_user.id).order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
+    tasks_data = [
+        {
+            'title': t.title,
+            'description': t.description or '',
+            'priority': t.priority,
+            'category': t.category,
+            'due_date': t.due_date.isoformat() if t.due_date else None,
+            'completed': t.completed
+        }
+        for t in tasks
+    ]
+    resp = jsonify(tasks_data)
+    resp.headers['Content-Disposition'] = 'attachment; filename="tasks.json"'
+    resp.headers['Content-Type'] = 'application/json'
+    return resp
+
+@main_bp.post('/tasks/import')
+@login_required
+def import_tasks_route():
+    try:
+        from app.routes.api import extract_task_list, validate_and_parse_task_item
+        items = extract_task_list(request)
+        validated = [validate_and_parse_task_item(item, idx) for idx, item in enumerate(items)]
+        for task_dict in validated:
+            t = Task(
+                user_id=current_user.id,
+                title=task_dict['title'],
+                description=task_dict['description'],
+                priority=task_dict['priority'],
+                category=task_dict['category'],
+                due_date=task_dict['due_date'],
+                completed=task_dict['completed']
+            )
+            db.session.add(t)
+        db.session.commit()
+        flash(f'Successfully imported {len(validated)} task(s).', 'success')
+    except ValueError as e:
+        db.session.rollback()
+        flash(str(e), 'error')
+    except Exception:
+        db.session.rollback()
+        flash('Failed to import tasks.', 'error')
+    return redirect(url_for('main.tasks'))
+
 @main_bp.get('/deadlines')
 @login_required
 def deadlines(): return render_template('deadlines.html', tasks=Task.query.filter_by(user_id=current_user.id).order_by(Task.due_date.asc().nullslast()).all())
