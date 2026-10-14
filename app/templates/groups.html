@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Collaborative learning</p>
+    <h1>Study Groups</h1>
+  </div>
+  <button class="btn primary" onclick="openModal('group-modal')">+ Create Study Group</button>
+</div>
+
+{% if my_groups %}
+<div style="margin-bottom: 24px;">
+  <h2 style="font-size: 1.2rem; margin-bottom: 12px;">My Study Groups</h2>
+  <div class="resource-grid">
+    {% for g in my_groups %}
+    <a class="resource-card" href="{{ url_for('main.group_detail', group_id=g.id) }}">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="chip">{{ g.subject }}</span>
+        <small class="muted">{{ g.members|length }} members</small>
+      </div>
+      <h3>{{ g.name }}</h3>
+      <p>{{ g.description[:120] }}{% if g.description|length > 120 %}...{% endif %}</p>
+      <small>Created by {{ g.creator.name }}</small>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div>
+  <h2 style="font-size: 1.2rem; margin-bottom: 12px;">All Study Groups</h2>
+  <div class="resource-grid">
+    {% for g in groups %}
+    <a class="resource-card" href="{{ url_for('main.group_detail', group_id=g.id) }}">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="chip">{{ g.subject }}</span>
+        <small class="muted">{{ g.members|length }} members</small>
+      </div>
+      <h3>{{ g.name }}</h3>
+      <p>{{ g.description[:120] }}{% if g.description|length > 120 %}...{% endif %}</p>
+      <small>Created by {{ g.creator.name }}</small>
+    </a>
+    {% else %}
+    <div class="card empty" style="grid-column: 1 / -1;">No study groups yet. Create one to get started!</div>
+    {% endfor %}
+  </div>
+</div>
+
+<div id="group-modal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeModal('group-modal')">×</button>
+    <h2>Create Study Group</h2>
+    <form method="POST" action="{{ url_for('main.groups') }}" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label>
+        Group Name
+        <input name="name" required maxlength="100" placeholder="e.g. CS101 Algorithm Study Circle">
+      </label>
+      <label>
+        Subject
+        <input name="subject" maxlength="100" placeholder="e.g. Computer Science, Math, General">
+      </label>
+      <label>
+        Description
+        <textarea name="description" maxlength="2000" rows="4" placeholder="What is this study group about?"></textarea>
+      </label>
+      <button class="btn primary">Create Group</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -81,3 +81,54 @@ class Notification(db.Model):
     kind = db.Column(db.String(30), default='info')
     read = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+
+class StudyGroup(db.Model):
+    __tablename__ = 'study_groups'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, default='')
+    subject = db.Column(db.String(100), default='General')
+    creator_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow, nullable=False)
+
+    creator = db.relationship('User', backref='created_groups', foreign_keys=[creator_id])
+    members = db.relationship('StudyGroupMember', backref='group', cascade='all, delete-orphan', lazy=True)
+    resources = db.relationship('StudyGroupResource', backref='group', cascade='all, delete-orphan', lazy=True)
+
+    def is_member(self, user_id):
+        return any(m.user_id == user_id for m in self.members)
+
+    def get_member(self, user_id):
+        for m in self.members:
+            if m.user_id == user_id:
+                return m
+        return None
+
+
+class StudyGroupMember(db.Model):
+    __tablename__ = 'study_group_members'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('study_groups.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    role = db.Column(db.String(20), default='member', nullable=False)
+    joined_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    user = db.relationship('User', backref='group_memberships')
+
+    __table_args__ = (db.UniqueConstraint('group_id', 'user_id', name='uq_group_user'),)
+
+
+class StudyGroupResource(db.Model):
+    __tablename__ = 'study_group_resources'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('study_groups.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    title = db.Column(db.String(150), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    description = db.Column(db.Text, default='')
+    resource_type = db.Column(db.String(30), default='Other', nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    user = db.relationship('User', backref='shared_group_resources')

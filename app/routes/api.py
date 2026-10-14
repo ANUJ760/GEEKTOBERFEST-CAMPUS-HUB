@@ -173,3 +173,173 @@ def delete_user_account_api():
     user_to_delete = current_user._get_current_object()
     delete_user_account(user_to_delete)
     return ok({'message': 'Account and all associated records deleted successfully.'})
+
+
+from app.models import StudyGroup, StudyGroupMember, StudyGroupResource
+
+def group_json(g, user_id=None):
+    res = {
+        'id': g.id,
+        'name': g.name,
+        'description': g.description,
+        'subject': g.subject,
+        'creator_id': g.creator_id,
+        'member_count': len(g.members),
+        'created_at': g.created_at.isoformat(),
+        'updated_at': g.updated_at.isoformat(),
+        'members': [{'user_id': m.user_id, 'name': m.user.name, 'role': m.role, 'joined_at': m.joined_at.isoformat()} for m in g.members]
+    }
+    if user_id:
+        res['is_member'] = g.is_member(user_id)
+        res['is_creator'] = g.creator_id == user_id
+    return res
+
+def group_resource_json(r):
+    return {
+        'id': r.id,
+        'group_id': r.group_id,
+        'user_id': r.user_id,
+        'user_name': r.user.name if r.user else 'Unknown',
+        'title': r.title,
+        'url': r.url,
+        'description': r.description,
+        'resource_type': r.resource_type,
+        'created_at': r.created_at.isoformat()
+    }
+
+@api_bp.post('/groups')
+@login_required
+def create_study_group_api():
+    d = request.get_json(silent=True) or {}
+    try:
+        name = limited(d.get('name'), 100)
+        desc = limited(d.get('description', ''), 2000, False)
+        subject = limited(d.get('subject', 'General'), 100, False) or 'General'
+        group = StudyGroup(name=name, description=desc, subject=subject, creator_id=current_user.id)
+        db.session.add(group)
+        db.session.flush()
+        member = StudyGroupMember(group_id=group.id, user_id=current_user.id, role='creator')
+        db.session.add(member)
+        db.session.commit()
+        return ok(group_json(group, current_user.id), 201)
+    except ValueError as e:
+        return err(str(e))
+
+@api_bp.get('/groups')
+@login_required
+def list_study_groups_api():
+    q = clean(request.args.get('search', '')).lower()
+    mine = request.args.get('mine', '').lower() in ('true', '1')
+    query = StudyGroup.query
+    if q:
+        query = query.filter(or_(StudyGroup.name.ilike(f'%{q}%'), StudyGroup.subject.ilike(f'%{q}%'), StudyGroup.description.ilike(f'%{q}%')))
+    groups = query.order_by(StudyGroup.created_at.desc()).all()
+    if mine:
+        groups = [g for g in groups if g.is_member(current_user.id)]
+    return ok([group_json(g, current_user.id) for g in groups])
+
+@api_bp.get('/groups/<int:group_id>')
+@login_required
+def get_study_group_api(group_id):
+    g = db.session.get(StudyGroup, group_id)
+    if not g:
+        return err('Study group not found.', 404)
+    return ok(group_json(g, current_user.id))
+
+@api_bp.delete('/groups/<int:group_id>')
+@login_required
+def delete_study_group_api(group_id):
+    g = db.session.get(StudyGroup, group_id)
+    if not g:
+        return err('Study group not found.', 404)
+    if g.creator_id != current_user.id and current_user.role != 'admin':
+        return err('Permission denied. Only creator or admin can delete group.', 403)
+    db.session.delete(g)
+    db.session.commit()
+    return ok({'message': 'Study group deleted successfully.'})
+
+@api_bp.post('/groups/<int:group_id>/join')
+@login_required
+def join_study_group_api(group_id):
+    g = db.session.get(StudyGroup, group_id)
+    if not g:
+        return err('Study group not found.', 404)
+    if g.is_member(current_user.id):
+        return err('Already a member of this study group.', 400)
+    m = StudyGroupMember(group_id=g.id, user_id=current_user.id, role='member')
+    db.session.add(m)
+    db.session.commit()
+    return ok(group_json(g, current_user.id))
+
+@api_bp.post('/groups/<int:group_id>/leave')
+@login_required
+def leave_study_group_api(group_id):
+    g = db.session.get(StudyGroup, group_id)
+    if not g:
+        return err('Study group not found.', 404)
+    m = g.get_member(current_user.id)
+    if not m:
+        return err('Not a member of this study group.', 400)
+    if g.creator_id == current_user.id:
+        other_members = [mem for mem in g.members if mem.user_id != current_user.id]
+        if other_members:
+            next_leader = sorted(other_members, key=lambda x: x.joined_at)[0]
+            next_leader.role = 'creator'
+            g.creator_id = next_leader.user_id
+            db.session.delete(m)
+            db.session.commit()
+            return ok({'message': 'Left study group. Leadership transferred.'})
+        else:
+            db.session.delete(g)
+            db.session.commit()
+            return ok({'message': 'Left study group. Group deleted because no members remain.'})
+    db.session.delete(m)
+    db.session.commit()
+    return ok({'message': 'Left study group successfully.'})
+
+@api_bp.get('/groups/<int:group_id>/resources')
+@login_required
+def list_group_resources_api(group_id):
+    g = db.session.get(StudyGroup, group_id)
+    if not g:
+        return err('Study group not found.', 404)
+    if not g.is_member(current_user.id) and current_user.role != 'admin':
+        return err('Must be a group member to view resources.', 403)
+    resources = StudyGroupResource.query.filter_by(group_id=g.id).order_by(StudyGroupResource.created_at.desc()).all()
+    return ok([group_resource_json(r) for r in resources])
+
+@api_bp.post('/groups/<int:group_id>/resources')
+@login_required
+def add_group_resource_api(group_id):
+    g = db.session.get(StudyGroup, group_id)
+    if not g:
+        return err('Study group not found.', 404)
+    if not g.is_member(current_user.id) and current_user.role != 'admin':
+        return err('Must be a group member to share resources.', 403)
+    d = request.get_json(silent=True) or {}
+    try:
+        title = limited(d.get('title'), 150)
+        url = valid_url(d.get('url'))
+        desc = limited(d.get('description', ''), 2000, False)
+        rtype = d.get('resource_type', 'Other')
+        res = StudyGroupResource(group_id=g.id, user_id=current_user.id, title=title, url=url, description=desc, resource_type=rtype)
+        db.session.add(res)
+        db.session.commit()
+        return ok(group_resource_json(res), 201)
+    except ValueError as e:
+        return err(str(e))
+
+@api_bp.delete('/groups/<int:group_id>/resources/<int:resource_id>')
+@login_required
+def delete_group_resource_api(group_id, resource_id):
+    g = db.session.get(StudyGroup, group_id)
+    if not g:
+        return err('Study group not found.', 404)
+    r = db.session.get(StudyGroupResource, resource_id)
+    if not r or r.group_id != g.id:
+        return err('Resource not found.', 404)
+    if r.user_id != current_user.id and g.creator_id != current_user.id and current_user.role != 'admin':
+        return err('Permission denied to delete this resource.', 403)
+    db.session.delete(r)
+    db.session.commit()
+    return ok({'message': 'Resource deleted successfully.'})

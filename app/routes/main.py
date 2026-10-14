@@ -84,3 +84,146 @@ def delete_account():
     delete_user_account(user_to_delete)
     flash('Your account and all associated data have been permanently deleted.', 'info')
     return redirect(url_for('auth.login'))
+
+
+from app.models import StudyGroup, StudyGroupMember, StudyGroupResource
+
+@main_bp.route('/groups', methods=['GET', 'POST'])
+@login_required
+def groups():
+    if request.method == 'POST':
+        try:
+            name = limited(request.form.get('name'), 100)
+            desc = limited(request.form.get('description'), 2000, False)
+            subject = limited(request.form.get('subject', 'General'), 100, False) or 'General'
+            group = StudyGroup(name=name, description=desc, subject=subject, creator_id=current_user.id)
+            db.session.add(group)
+            db.session.flush()
+            member = StudyGroupMember(group_id=group.id, user_id=current_user.id, role='creator')
+            db.session.add(member)
+            db.session.commit()
+            flash('Study group created successfully!', 'success')
+            return redirect(url_for('main.group_detail', group_id=group.id))
+        except ValueError as e:
+            flash(str(e), 'error')
+
+    all_groups = StudyGroup.query.order_by(StudyGroup.created_at.desc()).all()
+    my_groups = [g for g in all_groups if g.is_member(current_user.id)]
+    return render_template('groups.html', groups=all_groups, my_groups=my_groups)
+
+@main_bp.get('/groups/<int:group_id>')
+@login_required
+def group_detail(group_id):
+    group = db.session.get(StudyGroup, group_id)
+    if not group:
+        flash('Study group not found.', 'error')
+        return redirect(url_for('main.groups'))
+    is_member = group.is_member(current_user.id)
+    is_creator = group.creator_id == current_user.id or current_user.role == 'admin'
+    return render_template('group_detail.html', group=group, is_member=is_member, is_creator=is_creator)
+
+@main_bp.post('/groups/<int:group_id>/join')
+@login_required
+def join_group(group_id):
+    group = db.session.get(StudyGroup, group_id)
+    if not group:
+        flash('Study group not found.', 'error')
+        return redirect(url_for('main.groups'))
+    if group.is_member(current_user.id):
+        flash('You are already a member of this group.', 'info')
+    else:
+        member = StudyGroupMember(group_id=group.id, user_id=current_user.id, role='member')
+        db.session.add(member)
+        db.session.commit()
+        flash(f'Joined {group.name}!', 'success')
+    return redirect(url_for('main.group_detail', group_id=group.id))
+
+@main_bp.post('/groups/<int:group_id>/leave')
+@login_required
+def leave_group(group_id):
+    group = db.session.get(StudyGroup, group_id)
+    if not group:
+        flash('Study group not found.', 'error')
+        return redirect(url_for('main.groups'))
+    member = group.get_member(current_user.id)
+    if not member:
+        flash('You are not a member of this group.', 'error')
+        return redirect(url_for('main.group_detail', group_id=group.id))
+
+    if group.creator_id == current_user.id:
+        other_members = [m for m in group.members if m.user_id != current_user.id]
+        if other_members:
+            next_leader = sorted(other_members, key=lambda m: m.joined_at)[0]
+            next_leader.role = 'creator'
+            group.creator_id = next_leader.user_id
+            db.session.delete(member)
+            db.session.commit()
+            flash('You left the group. Leadership was transferred.', 'info')
+            return redirect(url_for('main.groups'))
+        else:
+            db.session.delete(group)
+            db.session.commit()
+            flash('You left the group. As the last member, the group was disbanded.', 'info')
+            return redirect(url_for('main.groups'))
+
+    db.session.delete(member)
+    db.session.commit()
+    flash(f'Left {group.name}.', 'info')
+    return redirect(url_for('main.groups'))
+
+@main_bp.post('/groups/<int:group_id>/delete')
+@login_required
+def delete_group(group_id):
+    group = db.session.get(StudyGroup, group_id)
+    if not group:
+        flash('Study group not found.', 'error')
+        return redirect(url_for('main.groups'))
+    if group.creator_id != current_user.id and current_user.role != 'admin':
+        flash('Only group creator or admin can delete this group.', 'error')
+        return redirect(url_for('main.group_detail', group_id=group.id))
+    db.session.delete(group)
+    db.session.commit()
+    flash('Study group deleted.', 'success')
+    return redirect(url_for('main.groups'))
+
+@main_bp.post('/groups/<int:group_id>/resources')
+@login_required
+def add_group_resource(group_id):
+    group = db.session.get(StudyGroup, group_id)
+    if not group:
+        flash('Study group not found.', 'error')
+        return redirect(url_for('main.groups'))
+    if not group.is_member(current_user.id) and current_user.role != 'admin':
+        flash('Only group members can share resources.', 'error')
+        return redirect(url_for('main.group_detail', group_id=group.id))
+    try:
+        title = limited(request.form.get('title'), 150)
+        url = valid_url(request.form.get('url'))
+        desc = limited(request.form.get('description'), 2000, False)
+        rtype = request.form.get('resource_type', 'Other')
+        res = StudyGroupResource(group_id=group.id, user_id=current_user.id, title=title, url=url, description=desc, resource_type=rtype)
+        db.session.add(res)
+        db.session.commit()
+        flash('Resource shared with the group!', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
+    return redirect(url_for('main.group_detail', group_id=group.id))
+
+@main_bp.post('/groups/<int:group_id>/resources/<int:resource_id>/delete')
+@login_required
+def delete_group_resource(group_id, resource_id):
+    group = db.session.get(StudyGroup, group_id)
+    if not group:
+        flash('Study group not found.', 'error')
+        return redirect(url_for('main.groups'))
+    res = db.session.get(StudyGroupResource, resource_id)
+    if not res or res.group_id != group.id:
+        flash('Resource not found.', 'error')
+        return redirect(url_for('main.group_detail', group_id=group.id))
+    if res.user_id != current_user.id and group.creator_id != current_user.id and current_user.role != 'admin':
+        flash('Permission denied to delete this resource.', 'error')
+        return redirect(url_for('main.group_detail', group_id=group.id))
+    db.session.delete(res)
+    db.session.commit()
+    flash('Shared resource deleted.', 'success')
+    return redirect(url_for('main.group_detail', group_id=group.id))
