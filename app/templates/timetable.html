@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="eyebrow">Weekly academic schedule</p>
+    <h1>Timetable</h1>
+  </div>
+  <button class="btn primary" onclick="openModal('class-modal')">+ Add Class</button>
+</div>
+
+{% if upcoming %}
+<div class="card" style="margin-bottom: 24px; border-left: 4px solid var(--primary);">
+  <h2 style="font-size: 1.1rem; margin-bottom: 10px;">Upcoming Classes</h2>
+  <div style="display: grid; gap: 8px;">
+    {% for u in upcoming %}
+    <div class="list-row" style="padding: 8px 0;">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <span class="badge {% if u.is_ongoing %}high{% elif u.is_today %}today{% else %}upcoming{% endif %}">
+          {% if u.is_ongoing %}NOW{% elif u.is_today %}Today{% else %}{{ u.day_name }}{% endif %}
+        </span>
+        <div>
+          <strong>{{ u.entry.course_code }} · {{ u.entry.course_name }}</strong>
+          <small class="muted">
+            {{ u.entry.start_time.strftime('%I:%M %p') }} - {{ u.entry.end_time.strftime('%I:%M %p') }}
+            {% if u.entry.location %} · 📍 {{ u.entry.location }}{% endif %}
+            {% if u.entry.instructor %} · 👤 {{ u.entry.instructor }}{% endif %}
+          </small>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+  {% for day_idx in range(7) %}
+  {% set day_name = days[day_idx] %}
+  {% set day_classes = schedule[day_idx] %}
+  <div class="card" style="display: flex; flex-direction: column; min-height: 200px;">
+    <div class="card-head" style="margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 8px;">
+      <h3 style="margin: 0; font-size: 16px;">{{ day_name }}</h3>
+      <span class="chip" style="font-size: 11px;">{{ day_classes|length }} classes</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
+      {% for c in day_classes %}
+      <div style="border: 1px solid var(--line); border-left: 4px solid {{ c.color }}; border-radius: 8px; padding: 10px; background: #fff;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <strong>{{ c.course_code }}</strong>
+          <form method="POST" action="{{ url_for('main.delete_timetable', item_id=c.id) }}" style="margin: 0;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="icon-btn" title="Delete class" onclick="return confirm('Remove {{ c.course_code }} from timetable?')">🗑</button>
+          </form>
+        </div>
+        <p style="margin: 2px 0 6px; font-size: 13px; color: var(--text);">{{ c.course_name }}</p>
+        <small class="muted" style="display: block;">
+          ⏰ {{ c.start_time.strftime('%I:%M %p') }} - {{ c.end_time.strftime('%I:%M %p') }}
+        </small>
+        {% if c.location %}<small class="muted" style="display: block;">📍 {{ c.location }}</small>{% endif %}
+        {% if c.instructor %}<small class="muted" style="display: block;">👤 {{ c.instructor }}</small>{% endif %}
+      </div>
+      {% else %}
+      <div class="empty" style="padding: 25px 10px; font-size: 13px;">No classes scheduled</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="class-modal" class="modal">
+  <div class="modal-box">
+    <button class="close" onclick="closeModal('class-modal')">×</button>
+    <h2>Add Class to Timetable</h2>
+    <form method="POST" action="{{ url_for('main.create_timetable') }}" class="form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-row">
+        <label>
+          Course Code
+          <input name="course_code" required maxlength="30" placeholder="e.g. CS101">
+        </label>
+        <label style="grid-column: span 2;">
+          Course Name
+          <input name="course_name" required maxlength="100" placeholder="e.g. Data Structures & Algorithms">
+        </label>
+      </div>
+
+      <div class="form-row">
+        <label>
+          Day of Week
+          <select name="day_of_week">
+            <option value="0">Monday</option>
+            <option value="1">Tuesday</option>
+            <option value="2">Wednesday</option>
+            <option value="3">Thursday</option>
+            <option value="4">Friday</option>
+            <option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+          </select>
+        </label>
+        <label>
+          Start Time
+          <input name="start_time" type="time" required>
+        </label>
+        <label>
+          End Time
+          <input name="end_time" type="time" required>
+        </label>
+      </div>
+
+      <div class="form-row">
+        <label>
+          Location
+          <input name="location" maxlength="100" placeholder="e.g. Room 402, Hall B">
+        </label>
+        <label>
+          Instructor
+          <input name="instructor" maxlength="100" placeholder="e.g. Dr. Alan Turing">
+        </label>
+        <label>
+          Color Tag
+          <input name="color" type="color" value="#3157d5" style="height: 42px; padding: 2px;">
+        </label>
+      </div>
+
+      <button class="btn primary">Save Class</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
