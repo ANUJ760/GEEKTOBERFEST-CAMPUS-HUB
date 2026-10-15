@@ -76,6 +76,17 @@ def import_tasks_route():
 @login_required
 def deadlines(): return render_template('deadlines.html', tasks=Task.query.filter_by(user_id=current_user.id).order_by(Task.due_date.asc().nullslast()).all())
 
+@main_bp.get('/deadlines/export.ics')
+@login_required
+def export_calendar():
+    from flask import Response
+    from app.services.calendar import generate_ics_calendar
+    tasks = Task.query.filter_by(user_id=current_user.id).filter(Task.due_date.isnot(None)).order_by(Task.due_date.asc()).all()
+    ics_data = generate_ics_calendar(tasks, cal_name=f"{current_user.name}'s Deadlines")
+    resp = Response(ics_data, mimetype='text/calendar')
+    resp.headers['Content-Disposition'] = 'attachment; filename="deadlines.ics"'
+    return resp
+
 
 from app.models import TimetableEntry, DAYS_OF_WEEK
 from app.services.timetable import parse_time_str, get_weekly_timetable, get_upcoming_classes
