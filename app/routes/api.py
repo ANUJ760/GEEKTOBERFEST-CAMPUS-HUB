@@ -79,6 +79,19 @@ def duplicate_task(item_id):
     dup=Task(user_id=current_user.id,title=copy_title,description=t.description,priority=t.priority,category=t.category,due_date=t.due_date,completed=False)
     db.session.add(dup); db.session.commit(); return ok(task_json(dup),201)
 
+@api_bp.post('/tasks/bulk-complete')
+@login_required
+def bulk_complete_tasks():
+    d=request.get_json(silent=True) or {}
+    ids=d.get('ids',[])
+    if not isinstance(ids,list): return err('List of IDs required.')
+    valid_ids=[int(i) for i in ids if isinstance(i,(int,str)) and str(i).isdigit()]
+    if not valid_ids: return err('No valid task IDs provided.')
+    tasks=Task.query.filter(Task.id.in_(valid_ids),Task.user_id==current_user.id).all()
+    for t in tasks: t.completed=True
+    db.session.commit(); return ok({'updated_count':len(tasks)})
+
+
 @api_bp.delete('/tasks/<int:item_id>')
 @login_required
 def delete_task(item_id):

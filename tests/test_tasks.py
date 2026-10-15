@@ -62,3 +62,31 @@ def test_task_duplication(client,student,admin):
     client.post('/logout')
     login(client, 'admin@test.local')
     assert client.post(f'/api/tasks/{tid}/duplicate').status_code == 404
+
+def test_bulk_complete_tasks(client,student,admin):
+    login(client)
+    r1 = client.post('/api/tasks', json={'title':'Task 1'})
+    r2 = client.post('/api/tasks', json={'title':'Task 2'})
+    id1, id2 = r1.get_json()['data']['id'], r2.get_json()['data']['id']
+
+    # Bulk complete
+    res = client.post('/api/tasks/bulk-complete', json={'ids':[id1, id2]})
+    assert res.status_code == 200
+    assert res.get_json()['data']['updated_count'] == 2
+
+    # Verify both are completed
+    tasks = client.get('/api/tasks').get_json()['data']
+    task_map = {t['id']: t['completed'] for t in tasks}
+    assert task_map[id1] is True
+    assert task_map[id2] is True
+
+    # Bad input
+    assert client.post('/api/tasks/bulk-complete', json={'ids':'bad'}).status_code == 400
+    assert client.post('/api/tasks/bulk-complete', json={'ids':[]}).status_code == 400
+
+    # UI check
+    page_res = client.get('/tasks')
+    assert page_res.status_code == 200
+    assert b'bulkCompleteBtn' in page_res.data
+    assert b'selectAllTasks' in client.get('/static/js/tasks.js').data
+
