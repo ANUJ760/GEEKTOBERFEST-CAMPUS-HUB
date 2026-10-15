@@ -19,3 +19,6 @@ tr.is-overdue td:first-child{border-left:3px solid var(--danger)}
 
 .period-form{margin:0;display:inline-block}
 .period-select{padding:4px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--text);cursor:pointer}
+
+@media print{.topbar,.sidebar,.toolbar,.menu,.top-actions,.note-actions,.modal,.flash-stack,.btn,.back-to-top,button{display:none!important}body{background:#fff!important;color:#000!important;font-size:12pt}.content,.public-content{margin:0!important;padding:0!important;max-width:100%!important}.notes-grid{display:block!important}.note-card{break-inside:avoid;page-break-inside:avoid;box-shadow:none!important;border:1px solid #ddd!important;margin-bottom:16px;padding:16px!important}.note-card p{color:#222!important}.page-head{margin-bottom:15px}}
+

@@ -29,3 +29,12 @@ def test_note_markdown_export(client,student,admin):
     client.post('/logout')
     login(client, 'admin@test.local')
     assert client.get(f'/notes/{nid}/export').status_code == 404
+
+def test_print_notes_stylesheet(client,student):
+    login(client)
+    res = client.get('/notes')
+    assert res.status_code == 200
+    css_res = client.get('/static/css/style.css')
+    assert css_res.status_code == 200
+    assert b'@media print' in css_res.data
+    assert b'page-break-inside' in css_res.data or b'break-inside' in css_res.data
